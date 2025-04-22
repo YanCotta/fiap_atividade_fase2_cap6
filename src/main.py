@@ -1,156 +1,168 @@
-import json
-import cx_Oracle
+"""
+Sistema de Gestão da Colheita de Cana-de-Açúcar
+Módulo principal da aplicação
+"""
+import sys
 from datetime import datetime
+from models.colheita import GerenciadorColheita, Colhedora, AreaColheita
+from database.db_handler import DatabaseHandler
+from utils.helpers import (
+    configurar_logging,
+    validar_data,
+    carregar_json,
+    salvar_json,
+    calcular_eficiencia_colheita,
+    validar_coordenadas
+)
+import logging
 
-# Constantes
-VALOR_IDEAL_MATURACAO = 18.0  # Índice mínimo de maturação para colheita
+class SistemaColheita:
+    def __init__(self):
+        configurar_logging()
+        self.logger = logging.getLogger(__name__)
+        self.gerenciador = GerenciadorColheita()
+        self.db = DatabaseHandler()
+        self.carregar_dados()
 
-# Função para calcular a data ideal de colheita
-def calcular_data_colheita(dados_maturacao):
-    for data, indice in dados_maturacao:
-        if indice >= VALOR_IDEAL_MATURACAO:
-            return data
-    return None
+    def carregar_dados(self):
+        """Carrega dados salvos do sistema."""
+        dados = carregar_json('dados_sistema.json')
+        if dados:
+            self.logger.info("Dados do sistema carregados com sucesso")
 
-# Função para alocar colhedoras
-def alocar_colhedoras(colhedoras_disponiveis, areas_a_colher):
-    alocacao = {}
-    colhedoras = colhedoras_disponiveis.copy()
-    for area in sorted(areas_a_colher, key=lambda x: x[1], reverse=True):
-        for colhedora in colhedoras:
-            if colhedora[1] >= area[1]:
-                alocacao[area[0]] = colhedora[0]
-                colhedoras.remove(colhedora)
-                break
-    return alocacao
+    def salvar_dados(self):
+        """Salva dados do sistema."""
+        dados = {
+            'areas': [vars(area) for area in self.gerenciador.areas],
+            'colhedoras': [vars(colhedora) for colhedora in self.gerenciador.colhedoras]
+        }
+        if salvar_json(dados, 'dados_sistema.json'):
+            self.logger.info("Dados do sistema salvos com sucesso")
 
-# Função para salvar dados em JSON
-def salvar_dados_json(dados, arquivo="colheita.json"):
-    with open(arquivo, 'w') as f:
-        json.dump(dados, f, indent=4)
-
-# Função para carregar dados de JSON
-def carregar_dados_json(arquivo="colheita.json"):
-    try:
-        with open(arquivo, 'r') as f:
-            return json.load(f)
-    except FileNotFoundError:
-        return []
-
-# Função para conectar ao banco Oracle e inserir dados
-def inserir_dados_banco(data_colheita, perda_estimada):
-    try:
-        connection = cx_Oracle.connect(user="seu_usuario", password="sua_senha",
-                                       dsn="localhost:1521/xe")
-        cursor = connection.cursor()
-        cursor.execute("INSERT INTO colheitas (data_colheita, perda_estimada) VALUES (:1, :2)",
-                       (data_colheita, perda_estimada))
-        connection.commit()
-        cursor.close()
-        connection.close()
-        print("Dados salvos no banco com sucesso!")
-    except cx_Oracle.Error as e:
-        print(f"Erro ao conectar ao banco: {e}")
-
-# Função para validar entrada numérica
-def validar_numero(prompt):
-    while True:
+    def cadastrar_area(self):
+        """Interface para cadastro de nova área."""
         try:
-            valor = float(input(prompt))
-            if valor < 0:
-                print("Digite um valor positivo!")
-                continue
-            return valor
-        except ValueError:
-            print("Entrada inválida! Digite um número.")
-
-# Interface de usuário
-def main():
-    dados_maturacao = []
-    colhedoras_disponiveis = []
-    areas_a_colher = []
-
-    while True:
-        print("\n=== Sistema de Gestão de Colheita ===")
-        print("1. Adicionar dados de maturação")
-        print("2. Calcular data ideal de colheita")
-        print("3. Adicionar colhedora")
-        print("4. Adicionar área a colher")
-        print("5. Alocar colhedoras")
-        print("6. Salvar dados em JSON")
-        print("7. Carregar dados de JSON")
-        print("8. Salvar colheita no banco")
-        print("9. Sair")
-
-        opcao = input("Escolha uma opção: ")
-
-        if opcao == "1":
-            data = input("Data (DD/MM/YYYY): ")
-            try:
-                datetime.strptime(data, "%d/%m/%Y")
-                indice = validar_numero("Índice de maturação: ")
-                dados_maturacao.append((data, indice))
-                print("Dados adicionados com sucesso!")
-            except ValueError:
-                print("Data inválida! Use o formato DD/MM/YYYY.")
-
-        elif opcao == "2":
-            if not dados_maturacao:
-                print("Nenhum dado de maturação cadastrado!")
-            else:
-                data_ideal = calcular_data_colheita(dados_maturacao)
-                if data_ideal:
-                    print(f"Data ideal para colheita: {data_ideal}")
-                else:
-                    print("Nenhum dado atingiu o índice ideal de maturação.")
-
-        elif opcao == "3":
-            id_colhedora = input("ID da colhedora: ")
-            capacidade = validar_numero("Capacidade (toneladas): ")
-            colhedoras_disponiveis.append((id_colhedora, capacidade))
-            print("Colhedora adicionada com sucesso!")
-
-        elif opcao == "4":
             id_area = input("ID da área: ")
-            tamanho = validar_numero("Tamanho (toneladas): ")
-            areas_a_colher.append((id_area, tamanho))
-            print("Área adicionada com sucesso!")
+            tamanho = float(input("Tamanho da área (hectares): "))
+            indice = float(input("Índice de maturação atual: "))
+            data_str = input("Data da medição (DD/MM/YYYY): ")
+            data = validar_data(data_str)
+            
+            lat = float(input("Latitude da área: "))
+            lon = float(input("Longitude da área: "))
+            
+            if not validar_coordenadas(lat, lon):
+                raise ValueError("Coordenadas geográficas inválidas")
 
-        elif opcao == "5":
-            if not colhedoras_disponiveis or not areas_a_colher:
-                print("Cadastre colhedoras e áreas antes de alocar!")
-            else:
-                alocacao = alocar_colhedoras(colhedoras_disponiveis, areas_a_colher)
-                if alocacao:
-                    print("Alocação de colhedoras:")
-                    for area, colhedora in alocacao.items():
-                        print(f"Área {area} -> Colhedora {colhedora}")
-                else:
-                    print("Não foi possível alocar todas as áreas.")
+            area = AreaColheita(
+                id=id_area,
+                tamanho=tamanho,
+                indice_maturacao=indice,
+                data_medicao=data,
+                localizacao={'lat': lat, 'lon': lon}
+            )
+            self.gerenciador.adicionar_area(area)
+            print("Área cadastrada com sucesso!")
+            self.logger.info(f"Nova área cadastrada: {id_area}")
+            
+        except ValueError as e:
+            print(f"Erro no cadastro: {e}")
+            self.logger.error(f"Erro ao cadastrar área: {e}")
 
-        elif opcao == "6":
-            salvar_dados_json(dados_maturacao)
-            print("Dados salvos em colheita.json!")
+    def cadastrar_colhedora(self):
+        """Interface para cadastro de nova colhedora."""
+        try:
+            id_colhedora = input("ID da colhedora: ")
+            capacidade = float(input("Capacidade de colheita (ton/dia): "))
+            
+            colhedora = Colhedora(id=id_colhedora, capacidade=capacidade)
+            self.gerenciador.adicionar_colhedora(colhedora)
+            print("Colhedora cadastrada com sucesso!")
+            self.logger.info(f"Nova colhedora cadastrada: {id_colhedora}")
+            
+        except ValueError as e:
+            print(f"Erro no cadastro: {e}")
+            self.logger.error(f"Erro ao cadastrar colhedora: {e}")
 
-        elif opcao == "7":
-            dados_maturacao = carregar_dados_json()
-            print("Dados carregados:", dados_maturacao)
-
-        elif opcao == "8":
-            data_colheita = input("Data da colheita (DD/MM/YYYY): ")
-            try:
-                datetime.strptime(data_colheita, "%d/%m/%Y")
-                perda = validar_numero("Perda estimada (%): ")
-                inserir_dados_banco(data_colheita, perda)
-            except ValueError:
-                print("Data inválida! Use o formato DD/MM/YYYY.")
-
-        elif opcao == "9":
-            print("Saindo...")
-            break
-
+    def realizar_alocacao(self):
+        """Realiza a alocação de colhedoras às áreas."""
+        alocacao = self.gerenciador.alocar_colhedoras()
+        if alocacao:
+            print("\nAlocação de colhedoras:")
+            for area_id, colhedora_id in alocacao.items():
+                print(f"Área {area_id} -> Colhedora {colhedora_id}")
+            self.logger.info(f"Alocação realizada com sucesso: {len(alocacao)} áreas alocadas")
         else:
-            print("Opção inválida!")
+            print("Não foi possível realizar alocações no momento.")
+            self.logger.warning("Tentativa de alocação sem áreas ou colhedoras disponíveis")
+
+    def registrar_colheita(self):
+        """Registra os dados de uma colheita realizada."""
+        try:
+            area_id = input("ID da área colhida: ")
+            colhedora_id = input("ID da colhedora utilizada: ")
+            producao = float(input("Produção total (toneladas): "))
+            perda = float(input("Perda estimada (%): "))
+            data_str = input("Data da colheita (DD/MM/YYYY): ")
+            data = validar_data(data_str)
+
+            dados_colheita = {
+                'data_colheita': data,
+                'area_id': area_id,
+                'colhedora_id': colhedora_id,
+                'producao_total': producao,
+                'perda_estimada': perda
+            }
+
+            if self.db.salvar_colheita(dados_colheita):
+                print("Colheita registrada com sucesso!")
+                self.logger.info(f"Colheita registrada para área {area_id}")
+            else:
+                print("Erro ao registrar colheita no banco de dados.")
+
+        except ValueError as e:
+            print(f"Erro no registro: {e}")
+            self.logger.error(f"Erro ao registrar colheita: {e}")
+
+    def menu_principal(self):
+        """Menu principal do sistema."""
+        while True:
+            print("\n=== Sistema de Gestão da Colheita de Cana-de-Açúcar ===")
+            print("1. Cadastrar Nova Área")
+            print("2. Cadastrar Nova Colhedora")
+            print("3. Realizar Alocação de Colhedoras")
+            print("4. Registrar Colheita")
+            print("5. Visualizar Áreas Prioritárias")
+            print("6. Salvar Dados do Sistema")
+            print("7. Sair")
+
+            opcao = input("\nEscolha uma opção: ")
+
+            if opcao == "1":
+                self.cadastrar_area()
+            elif opcao == "2":
+                self.cadastrar_colhedora()
+            elif opcao == "3":
+                self.realizar_alocacao()
+            elif opcao == "4":
+                self.registrar_colheita()
+            elif opcao == "5":
+                areas_prioritarias = self.gerenciador.calcular_prioridade_colheita()
+                if areas_prioritarias:
+                    print("\nÁreas Prioritárias para Colheita:")
+                    for area in areas_prioritarias:
+                        print(f"Área {area.id} - Índice de Maturação: {area.indice_maturacao}")
+                else:
+                    print("Não há áreas prontas para colheita no momento.")
+            elif opcao == "6":
+                self.salvar_dados()
+            elif opcao == "7":
+                print("Salvando dados e encerrando...")
+                self.salvar_dados()
+                sys.exit(0)
+            else:
+                print("Opção inválida!")
 
 if __name__ == "__main__":
-    main()
+    sistema = SistemaColheita()
+    sistema.menu_principal()

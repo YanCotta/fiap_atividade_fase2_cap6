@@ -18,56 +18,125 @@
 - André Godoi Chiovato
 
 ## Informações do Aluno
-
 - **Nome**: Yan Pimentel Cotta
 - **RM**: 562836
 - **Fase**: 2
 - **Capítulo**: 7
 
 ## Introdução
-Este projeto foi desenvolvido como parte da atividade avaliativa da disciplina de Gestão do Agronegócio em Python. O objetivo é criar uma solução tecnológica que auxilie na redução das perdas na colheita mecânica de cana-de-açúcar, um problema significativo no agronegócio brasileiro. Segundo estudos, as perdas na colheita mecânica podem chegar a 15%, representando prejuízos financeiros expressivos. Este sistema propõe otimizar o planejamento, o monitoramento da maturação e a alocação de colhedoras para minimizar essas perdas.
+Este projeto foi desenvolvido como parte da atividade avaliativa da disciplina de Gestão do Agronegócio em Python. Utilizando princípios avançados de programação orientada a objetos e arquitetura modular, criamos uma solução tecnológica robusta para otimizar a colheita mecânica de cana-de-açúcar, visando reduzir as perdas que podem chegar a 15% da produção.
 
-## Problema Tratado
-O foco desta solução é abordar as altas perdas na colheita mecânica de cana-de-açúcar, um setor em que o Brasil é líder mundial. A mecanização, embora inevitável e eficiente em escala, aumenta as perdas em comparação à colheita manual (5%). A solução visa:
-- Determinar o momento ideal de colheita com base em dados de maturação.
-- Otimizar a alocação de colhedoras para maximizar a eficiência.
-- Armazenar e consultar dados históricos para suportar decisões futuras.
+## Arquitetura do Sistema
+O projeto segue uma arquitetura modular com separação clara de responsabilidades:
 
-## Solução Proposta
-O sistema foi implementado em Python e inclui os seguintes módulos:
-1. **Planejamento da Colheita**: Calcula o momento ideal de colheita com base em índices de maturação.
-2. **Gestão de Colhedoras**: Aloca colhedoras de forma eficiente, considerando capacidade e demanda.
-3. **Armazenamento de Dados**: Usa arquivos JSON para configurações e um banco de dados Oracle para dados históricos.
-4. **Interface de Usuário**: Permite interação via prompt de comando, com validação de entradas.
+```
+src/
+├── config/           # Configurações do sistema
+│   └── database.py   # Configurações do banco de dados
+├── database/         # Camada de persistência
+│   └── db_handler.py # Gerenciamento de conexão com Oracle
+├── models/           # Modelos de domínio
+│   └── colheita.py   # Classes principais do sistema
+├── utils/            # Utilitários
+│   └── helpers.py    # Funções auxiliares
+└── main.py          # Ponto de entrada da aplicação
+```
 
-### Tecnologias Utilizadas
-- **Subalgoritmos**: Funções e procedimentos com passagem de parâmetros para modularizar a lógica.
-- **Estruturas de Dados**: Listas para séries temporais, tuplas para colhedoras, e dicionários para parâmetros de cana.
-- **Manipulação de Arquivos**: Arquivos JSON para salvar e carregar dados de maturação.
-- **Conexão com Banco de Dados**: Integração com Oracle para armazenar históricos de colheita.
+## Funcionalidades Principais
 
-## Como Executar
-1. **Pré-requisitos**:
-   - Python 3.x instalado.
-   - Biblioteca `cx_Oracle` instalada (`pip install cx_Oracle`).
-   - Banco de dados Oracle configurado com as credenciais fornecidas no código.
-2. **Passos**:
-   - Clone o repositório GitHub.
-   - Execute o arquivo `main.py` no terminal: `python main.py`.
-   - Siga as instruções no prompt para interagir com o sistema.
+### 1. Gestão de Áreas
+- Cadastro georreferenciado de áreas de cultivo
+- Monitoramento de índices de maturação
+- Cálculo automático de prioridade de colheita
 
-## Inovação
-A solução propõe uma abordagem integrada que combina análise de dados de maturação com gestão logística de colhedoras, algo essencial para reduzir perdas na colheita mecânica. A conexão com banco de dados permite escalabilidade e uso de dados históricos para previsões futuras, alinhando-se às tendências de agrotechs.
+### 2. Gerenciamento de Colhedoras
+- Cadastro e monitoramento de equipamentos
+- Controle de capacidade e manutenção
+- Sistema inteligente de alocação
 
-## Estrutura do Código
-- `main.py`: Arquivo principal com a lógica do sistema e interface de usuário.
-- `colheita.json`: Arquivo gerado para armazenar dados de maturação.
+### 3. Otimização de Colheita
+- Algoritmo de priorização baseado em múltiplos fatores
+- Integração com dados geográficos
+- Minimização de perdas na colheita
 
-## Exemplo de Uso
-1. Insira dados de maturação (data e índice) para determinar o momento ideal de colheita.
-2. Cadastre colhedoras e áreas a colher para receber uma alocação otimizada.
-3. Consulte ou salve dados no banco de dados Oracle.
+### 4. Persistência de Dados
+- Armazenamento local em JSON para configurações
+- Banco de dados Oracle para histórico e análises
+- Sistema de logging para auditoria
+
+## Tecnologias Utilizadas
+
+### Backend
+- Python 3.x
+- Oracle Database
+- Bibliotecas:
+  - cx_Oracle: Integração com banco de dados
+  - dataclasses: Modelagem de dados
+  - logging: Sistema de logs
+  - json: Persistência local
+
+### Ferramentas de Desenvolvimento
+- Git: Controle de versão
+- VS Code: IDE principal
+- Oracle SQL Developer: Gerenciamento do banco
+
+## Instalação e Configuração
+
+1. Clone o repositório:
+```bash
+git clone [url-do-repositorio]
+```
+
+2. Instale as dependências:
+```bash
+pip install -r requirements.txt
+```
+
+3. Configure o banco de dados:
+- Crie um banco Oracle
+- Configure as credenciais em `src/config/database.py`
+
+4. Execute o sistema:
+```bash
+python src/main.py
+```
+
+## Uso do Sistema
+
+### Cadastro de Áreas
+```python
+# Exemplo de cadastro de área
+area = AreaColheita(
+    id="A001",
+    tamanho=50.0,  # hectares
+    indice_maturacao=18.5,
+    data_medicao=datetime.now(),
+    localizacao={'lat': -23.5505, 'lon': -46.6333}
+)
+```
+
+### Alocação de Colhedoras
+O sistema automaticamente:
+1. Avalia índices de maturação
+2. Considera distâncias geográficas
+3. Otimiza a distribuição de equipamentos
+
+## Monitoramento e Logging
+- Logs detalhados de operações
+- Rastreamento de eficiência
+- Histórico de colheitas
+
+## Contribuição
+Para contribuir com o projeto:
+1. Faça um Fork
+2. Crie uma branch para sua feature
+3. Faça commit das alterações
+4. Push para a branch
+5. Abra um Pull Request
 
 ## Referências
-- SOCICANA: Perdas na colheita de cana-de-açúcar.
-- Blog CHB Agro: <https://blog.chbagro.com.br/perdas-na-colheita-de-cana-voce-sabe-como-reduzi-las>.
+- SOCICANA: Perdas na colheita de cana-de-açúcar
+- Blog CHB Agro: <https://blog.chbagro.com.br/perdas-na-colheita-de-cana-voce-sabe-como-reduzi-las>
+
+## Licença
+Este projeto está sob a licença MIT.
